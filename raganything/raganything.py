@@ -31,6 +31,8 @@ from raganything.modalprocessors import (
     GenericModalProcessor,
 )
 
+from raganything.cross_modal_relationships import CrossModalRelationshipManager
+
 
 class RAGAnything:
     """Multimodal Document Processing Pipeline - Complete document parsing and insertion pipeline"""
@@ -98,8 +100,15 @@ class RAGAnything:
             ),
         }
 
+        # Initialize cross-modal relationship manager
+        self.cross_modal_manager = CrossModalRelationshipManager(
+            lightrag=self.lightrag,
+            llm_model_func=self.llm_model_func
+        )
+
         self.logger.info("Multimodal processors initialized")
         self.logger.info(f"Available processors: {list(self.modal_processors.keys())}")
+        self.logger.info("Cross-modal relationship manager initialized")
 
     async def _ensure_lightrag_initialized(self):
         """Ensure LightRAG instance is initialized, create if necessary"""
@@ -368,6 +377,45 @@ class RAGAnything:
 
         self.logger.info("Multimodal content processing complete")
 
+    async def _process_cross_modal_relationships(
+        self, file_path: str, document_context: str = ""
+    ):
+        """
+        Process cross-modal relationships between text and modal entities
+        
+        Args:
+            file_path: File path for entity extraction
+            document_context: Document context for relationship inference
+        """
+        if not hasattr(self, 'cross_modal_manager'):
+            self.logger.warning("Cross-modal relationship manager not initialized")
+            return
+        
+        self.logger.info("Starting cross-modal relationship processing...")
+        
+        try:
+            # Process cross-modal relationships
+            result = await self.cross_modal_manager.process_document_relationships(
+                file_path=file_path,
+                document_context=document_context
+            )
+            
+            if "error" in result:
+                self.logger.error(f"Error in cross-modal relationship processing: {result['error']}")
+            else:
+                self.logger.info(f"Cross-modal relationship processing complete:")
+                self.logger.info(f"  - Text entities: {result['text_entities']}")
+                self.logger.info(f"  - Modal entities: {result['modal_entities']}")
+                self.logger.info(f"  - Relationships created: {result['relationships_created']}")
+                
+                # Log created relationships
+                for rel in result.get('relationships', []):
+                    self.logger.info(f"    {rel['source']} --[{rel['type']}]--> {rel['target']}")
+                    
+        except Exception as e:
+            self.logger.error(f"Error processing cross-modal relationships: {str(e)}")
+            self.logger.debug("Exception details:", exc_info=True)
+
     def _get_processor_for_type(self, content_type: str):
         """
         Get appropriate processor based on content type
@@ -438,6 +486,9 @@ class RAGAnything:
         # Step 4: Process multimodal content (using specialized processors)
         if multimodal_items:
             await self._process_multimodal_content(multimodal_items, file_path)
+
+        # Step 5: Process cross-modal relationships
+        await self._process_cross_modal_relationships(file_path, text_content)
 
         self.logger.info(f"Document {file_path} processing complete!")
 
