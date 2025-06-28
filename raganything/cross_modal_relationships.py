@@ -12,6 +12,7 @@ import logging
 import os
 from typing import Dict, List, Any, Tuple, Optional
 from dataclasses import dataclass
+import re
 
 from lightrag.utils import logger, compute_mdhash_id
 from lightrag.kg.shared_storage import get_namespace_data, get_pipeline_status_lock
@@ -282,7 +283,6 @@ class CrossModalRelationshipManager:
             self.logger.info("Parsing LLM response for relationships...")
             
             # Extract JSON from response
-            import re
             json_match = re.search(r'\[.*\]', response, re.DOTALL)
             if not json_match:
                 self.logger.warning("No JSON array found in LLM response")
@@ -303,9 +303,9 @@ class CrossModalRelationshipManager:
                     self.logger.warning(f"Relationship {i+1} missing required fields: {rel_data}")
                     continue
                 
-                # Find corresponding entities
-                source_entity = next((e for e in text_entities if e.entity_name == rel_data["source_entity"]), None)
-                target_entity = next((e for e in modal_entities if e.entity_name == rel_data["target_entity"]), None)
+                # Find corresponding entities with fuzzy matching
+                source_entity = self._find_matching_entity(rel_data["source_entity"], text_entities)
+                target_entity = self._find_matching_entity(rel_data["target_entity"], modal_entities)
                 
                 if source_entity and target_entity:
                     self.logger.info(f"Found matching entities: {source_entity.entity_name} -> {target_entity.entity_name}")
@@ -331,6 +331,29 @@ class CrossModalRelationshipManager:
             self.logger.debug("Exception details:", exc_info=True)
         
         return relationships
+
+    def _find_matching_entity(self, entity_name: str, entities: List[EntityInfo]) -> Optional[EntityInfo]:
+        """Find matching entity with fuzzy matching logic"""
+        # First try exact match
+        for entity in entities:
+            if entity.entity_name == entity_name:
+                return entity
+        
+        # Try matching without suffixes (e.g., "Serene Mountain Landscape" matches "Serene Mountain Landscape (image)")
+        for entity in entities:
+            # Remove common suffixes like "(image)", "(table)", "(equation)"
+            clean_entity_name = re.sub(r'\s*\([^)]+\)$', '', entity.entity_name)
+            if clean_entity_name == entity_name:
+                self.logger.info(f"Found fuzzy match: '{entity_name}' -> '{entity.entity_name}'")
+                return entity
+        
+        # Try partial matching (entity_name is contained in actual entity name)
+        for entity in entities:
+            if entity_name.lower() in entity.entity_name.lower():
+                self.logger.info(f"Found partial match: '{entity_name}' -> '{entity.entity_name}'")
+                return entity
+        
+        return None
 
     async def create_relationships_in_graph(self, relationships: List[RelationshipInfo]) -> None:
         """Create the inferred relationships in the knowledge graph"""
