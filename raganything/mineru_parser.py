@@ -177,14 +177,17 @@ class MineruParser:
                     continue
 
             for file_path in output_dir.rglob("*.json"):
-                try:
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        if isinstance(data, list):  # Likely content list
-                            content_list = data
-                            break
-                except Exception:
+                if "content_list" not in str(file_path):
                     continue
+                else:
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            if isinstance(data, list):  # Likely content list
+                                content_list = data
+                                break
+                    except Exception:
+                        continue
 
         return content_list, md_content
 
