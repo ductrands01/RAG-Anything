@@ -482,10 +482,32 @@ class RAGAnything:
                 split_by_character_only=split_by_character_only,
                 ids=doc_id,
             )
+            
+            # Debug: Check what entities are in the knowledge graph after text processing
+            try:
+                all_labels = await self.lightrag.chunk_entity_relation_graph.get_all_labels()
+                self.logger.info(f"After text processing: Found {len(all_labels)} entity labels in knowledge graph")
+                for label in all_labels:
+                    entity_data = await self.lightrag.chunk_entity_relation_graph.get_node(label)
+                    if entity_data:
+                        self.logger.info(f"  Entity: {label} -> {entity_data.get('file_path', 'NO_PATH')} ({entity_data.get('entity_type', 'NO_TYPE')})")
+            except Exception as e:
+                self.logger.warning(f"Error checking entities after text processing: {e}")
 
         # Step 4: Process multimodal content (using specialized processors)
         if multimodal_items:
             await self._process_multimodal_content(multimodal_items, file_path)
+            
+            # Debug: Check what entities are in the knowledge graph after multimodal processing
+            try:
+                all_labels = await self.lightrag.chunk_entity_relation_graph.get_all_labels()
+                self.logger.info(f"After multimodal processing: Found {len(all_labels)} entity labels in knowledge graph")
+                for label in all_labels:
+                    entity_data = await self.lightrag.chunk_entity_relation_graph.get_node(label)
+                    if entity_data:
+                        self.logger.info(f"  Entity: {label} -> {entity_data.get('file_path', 'NO_PATH')} ({entity_data.get('entity_type', 'NO_TYPE')})")
+            except Exception as e:
+                self.logger.warning(f"Error checking entities after multimodal processing: {e}")
 
         # Step 5: Process cross-modal relationships
         await self._process_cross_modal_relationships(file_path, text_content)

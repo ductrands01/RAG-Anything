@@ -95,13 +95,16 @@ class CrossModalRelationshipManager:
             
             # Get node data for each label
             for entity_id in all_labels:
+                self.logger.info(f"Processing entity label: {entity_id}")
                 entity_data = await self.knowledge_graph_inst.get_node(entity_id)
                 if entity_data:
-                    self.logger.debug(f"Entity {entity_id} data: {entity_data}")
+                    self.logger.info(f"Entity {entity_id} data: {entity_data}")
                     
                     # Check if this entity belongs to the target file
                     entity_file_path = entity_data.get("file_path", "")
                     entity_filename = os.path.basename(entity_file_path) if entity_file_path else ""
+                    
+                    self.logger.info(f"Entity {entity_id} file_path: '{entity_file_path}', filename: '{entity_filename}', target: '{target_filename}'")
                     
                     if entity_filename == target_filename:
                         entity_info = EntityInfo(
@@ -117,17 +120,20 @@ class CrossModalRelationshipManager:
                         # Categorize entities
                         if entity_info.entity_type in ["image", "table", "equation"]:
                             modal_entities.append(entity_info)
+                            self.logger.info(f"Added modal entity: {entity_info.entity_name} ({entity_info.entity_type})")
                         else:
                             text_entities.append(entity_info)
+                            self.logger.info(f"Added text entity: {entity_info.entity_name} ({entity_info.entity_type})")
                     else:
-                        self.logger.debug(f"Entity {entity_id} filename '{entity_filename}' doesn't match target '{target_filename}'")
+                        self.logger.info(f"Entity {entity_id} filename '{entity_filename}' doesn't match target '{target_filename}'")
                 else:
-                    self.logger.debug(f"No data found for entity {entity_id}")
+                    self.logger.info(f"No data found for entity {entity_id}")
             
             self.logger.info(f"Extracted {len(text_entities)} text entities and {len(modal_entities)} modal entities for file {target_filename}")
             
         except Exception as e:
             self.logger.error(f"Error extracting entities: {e}")
+            self.logger.debug("Exception details:", exc_info=True)
         
         return text_entities, modal_entities
 
