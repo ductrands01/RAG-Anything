@@ -9,6 +9,7 @@ textual entities and multimodal components.
 import asyncio
 import json
 import logging
+import os
 from typing import Dict, List, Any, Tuple, Optional
 from dataclasses import dataclass
 
@@ -75,28 +76,44 @@ class CrossModalRelationshipManager:
         try:
             # Get all entity labels from the knowledge graph
             all_labels = await self.knowledge_graph_inst.get_all_labels()
+            self.logger.info(f"Found {len(all_labels)} total entity labels in knowledge graph")
+            
+            # Extract just the filename from the full path for matching
+            target_filename = os.path.basename(file_path)
+            self.logger.info(f"Looking for entities with filename: {target_filename}")
             
             # Get node data for each label
             for entity_id in all_labels:
                 entity_data = await self.knowledge_graph_inst.get_node(entity_id)
-                if entity_data and entity_data.get("file_path") == file_path:
-                    entity_info = EntityInfo(
-                        entity_name=entity_data.get("entity_id", ""),
-                        entity_type=entity_data.get("entity_type", ""),
-                        description=entity_data.get("description", ""),
-                        source_id=entity_data.get("source_id", ""),
-                        file_path=entity_data.get("file_path", ""),
-                        content=entity_data.get("content", ""),
-                        chunk_id=entity_data.get("source_id", "")
-                    )
+                if entity_data:
+                    self.logger.debug(f"Entity {entity_id} data: {entity_data}")
                     
-                    # Categorize entities
-                    if entity_info.entity_type in ["image", "table", "equation"]:
-                        modal_entities.append(entity_info)
+                    # Check if this entity belongs to the target file
+                    entity_file_path = entity_data.get("file_path", "")
+                    entity_filename = os.path.basename(entity_file_path) if entity_file_path else ""
+                    
+                    if entity_filename == target_filename:
+                        entity_info = EntityInfo(
+                            entity_name=entity_data.get("entity_id", ""),
+                            entity_type=entity_data.get("entity_type", ""),
+                            description=entity_data.get("description", ""),
+                            source_id=entity_data.get("source_id", ""),
+                            file_path=entity_data.get("file_path", ""),
+                            content=entity_data.get("content", ""),
+                            chunk_id=entity_data.get("source_id", "")
+                        )
+                        
+                        # Categorize entities
+                        if entity_info.entity_type in ["image", "table", "equation"]:
+                            modal_entities.append(entity_info)
+                        else:
+                            text_entities.append(entity_info)
                     else:
-                        text_entities.append(entity_info)
+                        self.logger.debug(f"Entity {entity_id} filename '{entity_filename}' doesn't match target '{target_filename}'")
+                else:
+                    self.logger.debug(f"No data found for entity {entity_id}")
             
-            self.logger.info(f"Extracted {len(text_entities)} text entities and {len(modal_entities)} modal entities")
+            self.logger.info(f"Extracted {len(text_entities)} text entities and {len(modal_entities)} modal entities for file {target_filename}")
             
         except Exception as e:
             self.logger.error(f"Error extracting entities: {e}")
