@@ -49,6 +49,17 @@ class CrossModalRelationshipManager:
         self.lightrag = lightrag
         self.llm_model_func = llm_model_func
         self.logger = logging.getLogger("CrossModalRelationshipManager")
+        self.logger.setLevel(logging.INFO)  # Ensure we can see INFO and DEBUG messages
+        
+        # Add console handler if none exists
+        if not self.logger.handlers:
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            formatter = logging.Formatter('%(name)s: %(message)s')
+            console_handler.setFormatter(formatter)
+            self.logger.addHandler(console_handler)
+        
+        self.logger.propagate = True  # Ensure messages propagate to parent loggers
         
         # Use LightRAG's storage instances
         self.text_chunks_db = lightrag.text_chunks
@@ -132,23 +143,37 @@ class CrossModalRelationshipManager:
         relationships = []
         
         if not text_entities or not modal_entities:
+            self.logger.info(f"No relationships to infer: text_entities={len(text_entities)}, modal_entities={len(modal_entities)}")
             return relationships
         
         self.logger.info(f"Inferring relationships between {len(text_entities)} text entities and {len(modal_entities)} modal entities")
+        
+        # Log some sample entities for debugging
+        self.logger.info("Sample text entities:")
+        for i, entity in enumerate(text_entities[:3]):  # Show first 3
+            self.logger.info(f"  {i+1}. {entity.entity_name} ({entity.entity_type}): {entity.description[:100]}...")
+        
+        self.logger.info("Sample modal entities:")
+        for i, entity in enumerate(modal_entities[:3]):  # Show first 3
+            self.logger.info(f"  {i+1}. {entity.entity_name} ({entity.entity_type}): {entity.description[:100]}...")
         
         # Create batches for processing
         batch_size = 5  # Process in smaller batches to avoid token limits
         text_batches = [text_entities[i:i + batch_size] for i in range(0, len(text_entities), batch_size)]
         modal_batches = [modal_entities[i:i + batch_size] for i in range(0, len(modal_entities), batch_size)]
         
-        for text_batch in text_batches:
-            for modal_batch in modal_batches:
+        self.logger.info(f"Created {len(text_batches)} text batches and {len(modal_batches)} modal batches for processing")
+        
+        for text_batch_idx, text_batch in enumerate(text_batches):
+            for modal_batch_idx, modal_batch in enumerate(modal_batches):
+                self.logger.info(f"Processing batch {text_batch_idx+1}/{len(text_batches)} x {modal_batch_idx+1}/{len(modal_batches)}")
                 batch_relationships = await self._process_relationship_batch(
                     text_batch, modal_batch, document_context
                 )
                 relationships.extend(batch_relationships)
+                self.logger.info(f"Batch completed with {len(batch_relationships)} relationships")
         
-        self.logger.info(f"Inferred {len(relationships)} cross-modal relationships")
+        self.logger.info(f"Inferred {len(relationships)} cross-modal relationships total")
         return relationships
 
     async def _process_relationship_batch(
@@ -160,21 +185,29 @@ class CrossModalRelationshipManager:
         """Process a batch of entities for relationship inference"""
         relationships = []
         
+        self.logger.info(f"Processing batch with {len(text_entities)} text entities and {len(modal_entities)} modal entities")
+        
         # Build prompt for relationship inference
         prompt = self._build_relationship_prompt(text_entities, modal_entities, document_context)
         
         try:
+            self.logger.info("Calling LLM for relationship inference...")
             response = await self.llm_model_func(
                 prompt,
                 system_prompt="You are an expert at analyzing relationships between text content and multimodal elements in documents. Provide accurate relationship analysis in JSON format."
             )
             
+            self.logger.info(f"LLM response received (length: {len(response)})")
+            self.logger.debug(f"LLM response: {response[:500]}...")
+            
             # Parse response
             parsed_relationships = self._parse_relationship_response(response, text_entities, modal_entities)
+            self.logger.info(f"Parsed {len(parsed_relationships)} relationships from LLM response")
             relationships.extend(parsed_relationships)
             
         except Exception as e:
             self.logger.error(f"Error processing relationship batch: {e}")
+            self.logger.debug("Exception details:", exc_info=True)
         
         return relationships
 
@@ -240,17 +273,28 @@ class CrossModalRelationshipManager:
         relationships = []
         
         try:
+            self.logger.info("Parsing LLM response for relationships...")
+            
             # Extract JSON from response
             import re
             json_match = re.search(r'\[.*\]', response, re.DOTALL)
             if not json_match:
+                self.logger.warning("No JSON array found in LLM response")
+                self.logger.debug(f"Response content: {response[:200]}...")
                 return relationships
             
-            relationship_data = json.loads(json_match.group(0))
+            json_str = json_match.group(0)
+            self.logger.info(f"Found JSON array: {json_str[:200]}...")
             
-            for rel_data in relationship_data:
+            relationship_data = json.loads(json_str)
+            self.logger.info(f"Parsed {len(relationship_data)} relationship entries from JSON")
+            
+            for i, rel_data in enumerate(relationship_data):
+                self.logger.debug(f"Processing relationship {i+1}: {rel_data}")
+                
                 # Validate relationship data
                 if not all(key in rel_data for key in ["source_entity", "target_entity", "relationship_type", "description", "weight"]):
+                    self.logger.warning(f"Relationship {i+1} missing required fields: {rel_data}")
                     continue
                 
                 # Find corresponding entities
@@ -258,6 +302,7 @@ class CrossModalRelationshipManager:
                 target_entity = next((e for e in modal_entities if e.entity_name == rel_data["target_entity"]), None)
                 
                 if source_entity and target_entity:
+                    self.logger.info(f"Found matching entities: {source_entity.entity_name} -> {target_entity.entity_name}")
                     relationship = RelationshipInfo(
                         source_entity=source_entity.entity_name,
                         target_entity=target_entity.entity_name,
@@ -268,9 +313,16 @@ class CrossModalRelationshipManager:
                         file_path=source_entity.file_path
                     )
                     relationships.append(relationship)
+                else:
+                    self.logger.warning(f"Could not find matching entities for relationship {i+1}:")
+                    if not source_entity:
+                        self.logger.warning(f"  Source entity '{rel_data['source_entity']}' not found in text entities")
+                    if not target_entity:
+                        self.logger.warning(f"  Target entity '{rel_data['target_entity']}' not found in modal entities")
             
         except (json.JSONDecodeError, ValueError, KeyError) as e:
             self.logger.error(f"Error parsing relationship response: {e}")
+            self.logger.debug("Exception details:", exc_info=True)
         
         return relationships
 
