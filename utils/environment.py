@@ -21,7 +21,7 @@ def ensure_env_vars():
         ("NEO4J_USERNAME", "Neo4j username"),
         ("NEO4J_PASSWORD", "Neo4j password"),
         ("INPUT_DIR", "Input directory to process (leave blank if not needed)"),
-        ("INPUT_FILE", "Input directory to process (leave blank if not needed)")
+        # ("INPUT_FILE", "Input file to process (leave blank if not needed)")
     ]
     for var_name, prompt in env_var_prompts:
         value = os.environ.get(var_name)
