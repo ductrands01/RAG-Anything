@@ -81,8 +81,8 @@ setuptools.setup(
     project_urls={  # Additional project metadata
         "Documentation": metadata.get("__url__", ""),
         "Source": metadata.get("__url__", ""),
-        "Tracker": f"{metadata.get('__url__', '')}/issues"
-        if metadata.get("__url__")
-        else "",
+        "Tracker": (
+            f"{metadata.get('__url__', '')}/issues" if metadata.get("__url__") else ""
+        ),
     },
 )

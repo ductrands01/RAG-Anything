@@ -291,14 +291,19 @@ class ImageModalProcessor(BaseModalProcessor):
 
             # If image path exists, try to encode image
             image_base64 = ""
-            if image_path and Path(image_path).exists():
-                image_base64 = self._encode_image_to_base64(image_path)
+
+            if image_path:
+                processed_file_path = file_path.split(".")[0]
+                image_full_path = (
+                    Path("output") / processed_file_path / "auto" / image_path
+                )
+                image_base64 = self._encode_image_to_base64(image_full_path)
 
             # Call vision model
             if image_base64:
                 # Use real image for analysis
                 response = await self.modal_caption_func(
-                    vision_prompt,
+                    prompt=vision_prompt,
                     image_data=image_base64,
                     system_prompt="You are an expert image analyst. Provide detailed, accurate descriptions.",
                 )
@@ -337,9 +342,11 @@ class ImageModalProcessor(BaseModalProcessor):
             logger.error(f"Error processing image content: {e}")
             # Fallback processing
             fallback_entity = {
-                "entity_name": entity_name
-                if entity_name
-                else f"image_{compute_mdhash_id(str(modal_content))}",
+                "entity_name": (
+                    entity_name
+                    if entity_name
+                    else f"image_{compute_mdhash_id(str(modal_content))}"
+                ),
                 "entity_type": "image",
                 "summary": f"Image content: {str(modal_content)[:100]}",
             }
@@ -376,9 +383,11 @@ class ImageModalProcessor(BaseModalProcessor):
         except (json.JSONDecodeError, AttributeError, ValueError) as e:
             logger.error(f"Error parsing image analysis response: {e}")
             fallback_entity = {
-                "entity_name": entity_name
-                if entity_name
-                else f"image_{compute_mdhash_id(response)}",
+                "entity_name": (
+                    entity_name
+                    if entity_name
+                    else f"image_{compute_mdhash_id(response)}"
+                ),
                 "entity_type": "image",
                 "summary": response[:100] + "..." if len(response) > 100 else response,
             }
@@ -491,9 +500,11 @@ class TableModalProcessor(BaseModalProcessor):
         except (json.JSONDecodeError, AttributeError, ValueError) as e:
             logger.error(f"Error parsing table analysis response: {e}")
             fallback_entity = {
-                "entity_name": entity_name
-                if entity_name
-                else f"table_{compute_mdhash_id(response)}",
+                "entity_name": (
+                    entity_name
+                    if entity_name
+                    else f"table_{compute_mdhash_id(response)}"
+                ),
                 "entity_type": "table",
                 "summary": response[:100] + "..." if len(response) > 100 else response,
             }
@@ -599,9 +610,11 @@ class EquationModalProcessor(BaseModalProcessor):
         except (json.JSONDecodeError, AttributeError, ValueError) as e:
             logger.error(f"Error parsing equation analysis response: {e}")
             fallback_entity = {
-                "entity_name": entity_name
-                if entity_name
-                else f"equation_{compute_mdhash_id(response)}",
+                "entity_name": (
+                    entity_name
+                    if entity_name
+                    else f"equation_{compute_mdhash_id(response)}"
+                ),
                 "entity_type": "equation",
                 "summary": response[:100] + "..." if len(response) > 100 else response,
             }
@@ -690,9 +703,11 @@ class GenericModalProcessor(BaseModalProcessor):
         except (json.JSONDecodeError, AttributeError, ValueError) as e:
             logger.error(f"Error parsing generic analysis response: {e}")
             fallback_entity = {
-                "entity_name": entity_name
-                if entity_name
-                else f"{content_type}_{compute_mdhash_id(response)}",
+                "entity_name": (
+                    entity_name
+                    if entity_name
+                    else f"{content_type}_{compute_mdhash_id(response)}"
+                ),
                 "entity_type": content_type,
                 "summary": response[:100] + "..." if len(response) > 100 else response,
             }

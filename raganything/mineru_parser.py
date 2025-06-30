@@ -145,8 +145,8 @@ class MineruParser:
             # Check for files in subdirectory (MinerU 2.0 may create subdirectories)
             subdir = output_dir / file_stem
             if subdir.exists():
-                md_file = subdir / f"{file_stem}.md"
-                json_file = subdir / f"{file_stem}.json"
+                md_file = subdir / "auto" / f"{file_stem}.md"
+                json_file = subdir / "auto" / f"{file_stem}_content_list.json"
 
         # Read markdown content
         md_content = ""
@@ -231,7 +231,7 @@ class MineruParser:
             # Run mineru command
             MineruParser._run_mineru_command(
                 input_path=pdf_path,
-                output_dir=base_output_dir,
+                output_dir="output",
                 method=method,
                 lang=lang,
                 **kwargs,

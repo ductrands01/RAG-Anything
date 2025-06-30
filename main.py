@@ -7,10 +7,6 @@ import os
 
 from dotenv import load_dotenv
 from utils.environment import ensure_env_vars
-from utils.model_invocation import (
-    llm_model_func,
-    vision_model_func,
-)
 from pipeline import init_raganything, run_pipeline
 import asyncio
 
@@ -24,7 +20,7 @@ def main():
     print("---------------------------------------------------------------")
     print("Provide remote Neo4j and Postgres credentials.")
     ensure_env_vars()
-    rag = init_raganything(llm_model_func, vision_model_func)
+    rag = init_raganything()
     input_dir = os.getenv("INPUT_DIR")
     input_file = os.getenv("INPUT_FILE")
     try:

@@ -10,13 +10,12 @@ from lightrag import LightRAG
 from lightrag.utils import EmbeddingFunc
 from lightrag.llm.openai import openai_embed
 
+from utils.model_invocation import llm_model_func, get_vision_model_func
 
-def init_raganything(llm_model_func, vision_model_func):
+
+def init_raganything():
     """
     Initialize the RAGAnything object with LightRAG and model functions.
-    Args:
-        llm_model_func (callable): Function for LLM model invocation.
-        vision_model_func (callable): Function for vision model invocation.
     Returns:
         RAGAnything: Initialized RAGAnything instance.
     """
@@ -40,16 +39,8 @@ def init_raganything(llm_model_func, vision_model_func):
     )
     return RAGAnything(
         lightrag=lightrag_instance,
-        llm_model_func=llm_model_func,
-        vision_model_func=vision_model_func,
-        embedding_func=EmbeddingFunc(
-            embedding_dim=int(os.getenv("EMBEDDING_DIM")),
-            max_token_size=int(os.getenv("MAX_EMBEDDING_TOKEN_SIZE")),
-            func=lambda texts: openai_embed(
-                texts,
-                model=os.getenv("EMBEDDING_MODEL"),
-                api_key=os.getenv("OPENAI_API_KEY"),
-            ),
+        vision_model_func=get_vision_model_func(
+            prompt=None, system_prompt=None, image_data=None
         ),
     )
 
